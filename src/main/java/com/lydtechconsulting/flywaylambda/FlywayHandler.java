@@ -31,15 +31,18 @@ public class FlywayHandler implements RequestHandler<Map<String, String>, String
         LambdaLogger logger = context.getLogger();
         logDetails(event, context, logger);
 
-        if (!event.containsKey("bucket_name")) {
-            throw new NullPointerException("event must have bucket_name field");
-        }
-        String bucketName = event.get("bucket_name");
-        if (!event.containsKey("secret_name")) {
-            throw new NullPointerException("event must have secret_name field");
-        }
-        String secretName = event.get("secret_name");
-        String flywayScriptsLocation = "/tmp/sqlFiles_" + System.currentTimeMillis(); 
+        String bucketName = getStringParam(event, "bucket_name");
+        String secretName = getStringParam(event, "secret_name");
+        String dbName = getStringParam(event, "database_name");
+        String schemaName = getStringParam(event, "schema_name");
+        String usernameKey = getStringParam(event, "username_key", "username");
+        String passwordKey = getStringParam(event, "password_key", "password");
+        String hostKey = getStringParam(event, "host_key", "host");
+        String portKey = getStringParam(event, "port_key", "port");
+        String targetVersion = getStringParam(event, "target_version", "latest");
+        boolean doClean = Boolean.parseBoolean(getStringParam(event, "do_clean", "false"));
+
+        String flywayScriptsLocation = "/tmp/sqlFiles_" + System.currentTimeMillis();
         logger.log("bucketName: " + bucketName);
         logger.log("destination: " + flywayScriptsLocation);
         
@@ -56,9 +59,24 @@ public class FlywayHandler implements RequestHandler<Map<String, String>, String
         SecretsManagerClient secretsClient = SecretsManagerClient.builder()
                 .region(region)
                 .build();
-        flywayMigrationService.performMigration(logger, secretsClient, "filesystem://" + flywayScriptsLocation, secretName);
+        flywayMigrationService.performMigration(logger, secretsClient, "filesystem://" + flywayScriptsLocation, secretName,
+                usernameKey, passwordKey, hostKey, portKey, dbName, schemaName, targetVersion, doClean);
 
         return "200 OK";
+    }
+
+    private String getStringParam(Map<String, String> event, String paramName) {
+        return getStringParam(event, paramName, null);
+    }
+
+    private String getStringParam(Map<String, String> event, String paramName, String defaultValue) {
+        if (!event.containsKey(paramName)) {
+            if (defaultValue != null) {
+                return defaultValue;
+            }
+            throw new NullPointerException(String.format("event must have %s field", paramName));
+        }
+        return event.get(paramName);
     }
 
     private void createDirectory(String flywayScriptsLocation) {

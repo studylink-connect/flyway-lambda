@@ -12,6 +12,8 @@ import software.amazon.awssdk.services.s3.model.S3Object;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.List;
 
 public class FileDownloadService {
@@ -43,7 +45,9 @@ public class FileDownloadService {
             ResponseBytes<GetObjectResponse> objectAsBytes = s3Client.getObjectAsBytes(objectRequest);
             InputStream inputStream = objectAsBytes.asInputStream();
             try {
-                FileOutputStream fos = new FileOutputStream(new File(flywayScriptsLocation, key));
+                File file = new File(flywayScriptsLocation, key);
+                Files.createDirectories(file.toPath().getParent());
+                FileOutputStream fos = new FileOutputStream(file);
 
                 byte[] read_buf = new byte[1024];
                 int read_len = 0;
